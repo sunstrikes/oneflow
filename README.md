@@ -70,39 +70,7 @@
   - Releases are built with G++/GCC 4.8.5, cuDNN 7 and MKL 2020.0-088.
 
 ### Build from Source
-
-1. #### System Requirements to Build OneFlow
-
-    - Please use a newer version of CMake to build OneFlow. You could download cmake release from [here](https://github.com/Kitware/CMake/releases/download/v3.14.0/cmake-3.14.0-Linux-x86_64.tar.gz).
-
-    - Please make sure you have G++ and GCC >= 4.8.5 installed. Clang is not supported for now.
-
-    - To install dependencies, run:
-
-      ```
-      yum-config-manager --add-repo https://yum.repos.intel.com/setup/intelproducts.repo && \
-      rpm --import https://yum.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS-2019.PUB && \
-      yum update -y && yum install -y epel-release && \
-      yum install -y intel-mkl-64bit-2020.0-088 nasm swig rdma-core-devel
-      ```
-
-      On CentOS, if you have MKL installed, please update the environment variable:
-
-      ```
-      export LD_LIBRARY_PATH=/opt/intel/lib/intel64_lin:/opt/intel/mkl/lib/intel64:$LD_LIBRARY_PATH
-      ```
-
-      If you don't want to build OneFlow with MKL, you could install OpenBLAS.
-      On CentOS:
-      ```
-      sudo yum -y install openblas-devel
-      ```
-      On Ubuntu:
-      ```
-      sudo apt install -y libopenblas-dev
-      ```
-
-2. #### Clone Source Code
+1. #### Clone Source Code
 
     - #### Option 1: Clone source code from github
 
@@ -119,7 +87,7 @@
       unzip oneflow-src.zip
       ```
 
-3. #### Build and Install OneFlow
+2. #### Build and Install OneFlow
 
     - #### Option 1: Build in docker container (recommended)
       - In the root directory of OneFlow source code, run:
@@ -128,7 +96,7 @@
         python3 docker/package/manylinux/build_wheel.py
         ```
 
-        This should produces `.whl` files in the directory `wheelhouse`
+        This should produces `.whl` files in the directory `wheelhouse` and you might install a desired version.
 
       - If you are in China, you might need to add these flags:
 
@@ -145,18 +113,48 @@
       - For more useful flags, plese run the script with flag `--help` or refer to the source code of the script.
 
     - #### Option 2: Build on bare metal
-      - In the root directory of OneFlow source code, run:
+      1. Install ystem Requirements to Build OneFlow
 
-        ```
-        mkdir build
-        cd build
-        cmake ..
-        make -j$(nproc)
-        make pip_install
-        ```
+          - Please use a newer version of CMake to build OneFlow. You could download cmake release from [here](https://github.com/Kitware/CMake/releases/download/v3.14.0/cmake-3.14.0-Linux-x86_64.tar.gz).
 
-      - If you are in China, please add this CMake flag `-DTHIRD_PARTY_MIRROR=aliyun` to speed up the downloading procedure for some dependency tar files.
-      - For pure CPU build, please add this CMake flag `-DBUILD_CUDA=OFF`.
+          - Please make sure you have G++ and GCC >= 4.8.5 installed. Clang is not supported for now.
+
+          - To install dependencies, run:
+
+            ```
+            yum-config-manager --add-repo https://yum.repos.intel.com/setup/intelproducts.repo && \
+            rpm --import https://yum.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS-2019.PUB && \
+            yum update -y && yum install -y epel-release && \
+            yum install -y intel-mkl-64bit-2020.0-088 nasm swig rdma-core-devel
+            ```
+
+            On CentOS, if you have MKL installed, please update the environment variable:
+
+            ```
+            export LD_LIBRARY_PATH=/opt/intel/lib/intel64_lin:/opt/intel/mkl/lib/intel64:$LD_LIBRARY_PATH
+            ```
+
+            If you don't want to build OneFlow with MKL, you could install OpenBLAS.
+            On CentOS:
+            ```
+            sudo yum -y install openblas-devel
+            ```
+            On Ubuntu:
+            ```
+            sudo apt install -y libopenblas-dev
+            ```
+      2. In the root directory of OneFlow source code, run:
+
+          ```
+          mkdir build
+          cd build
+          cmake ..
+          make -j$(nproc)
+          make pip_install
+          ```
+
+        - If you are in China, please add this CMake flag `-DTHIRD_PARTY_MIRROR=aliyun` to speed up the downloading procedure for some dependency tar files.
+        - For pure CPU build, please add this CMake flag `-DBUILD_CUDA=OFF`.
 
 ### Troubleshooting
 
