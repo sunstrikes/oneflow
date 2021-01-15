@@ -382,7 +382,13 @@ def conv2d(
         input (oneflow_api.BlobDesc): A 4D input `Blob`. [batch_num, channel, height, width]
         filters (oneflow_api.BlobDesc): A `Blob` with the same type as `input` and has the shape `[out_channels, in_channels//groups, filter_height, filter_width] for NCHW, or [out_channels, filter_height, filter_width, in_channels//groups] for NHWC`
         strides (Union[int, IntPair]): An int or list of `ints` that has length `2`. The stride of the sliding window for each dimension of `input`.
-        padding (Union[str, Tuple[IntPair, IntPair, IntPair, IntPair]]): padding: `string` `"SAME"` or `"SAME_LOWER"` or `"SAME_UPPER"` or `"VALID" or Tuple[IntPair, IntPair, IntPair, IntPair]` indicating the type of padding algorithm to use, or a list indicating the explicit paddings at the start and end of each dimension.
+        padding (Union[str, Tuple[IntPair, IntPair, IntPair, IntPair]]): The padding mode. It can be `string` type like `"SAME"` or `"SAME_LOWER"` 
+            or `"SAME_UPPER" or `"VALID". 
+            It can also be a Tuple with four elements, each element contains one or two int values. 
+            if `data_format` is `NCHW`, the `padding` should be like ([0, 0], [0, 0], [padding_height_top, padding_height_bottom], [padding_width_top, padding_width_bottom])
+            or (0, 0, padding_height, padding_width). 
+            if `data_format` is `NHWC`, the `padding` should be like ([0, 0], [padding_height_top, padding_height_bottom], [padding_width_top, padding_width_bottom], [0, 0])
+            or (0, padding_height, padding_width, 0).
         data_format (str, optional): `"NHWC" or "NCHW"`. Defaults to `"NCHW"`.
         dilations (Optional[Union[int, IntPair]], optional): An int or list of `ints` that has length `2`. The dilation factor for each dimension of `input`. Defaults to None.
         groups (int, optional): int value greater than 0. Defaults to 1.
@@ -404,7 +410,35 @@ def conv2d(
 
         This api is more flexible, if you're new to OneFlow, it's more recommend to use `oneflow.layers.conv2d`. 
 
+    The shape formula is: 
+
+    When `padding` is a tuple, the output shape is: 
+
+        .. math:: 
+
+            & H_{out} = \frac{H_{in}+2*padding\_height - dilation[0]*(kernel\_size[0]-1)-1}{stride[0]} + 1 
+
+            & W_{out} = \frac{W_{in}+2*padding\_width - dilation[1]*(kernel\_size[1]-1)-1}{stride[1]} + 1
+
+    if `padding` == "SAME", the output shape is: 
+        
+        .. math:: 
+
+            & H_{out} = \frac{H_{in}+stride[0]+1}{stride[0]} + 1
+
+            & W_{out} = \frac{W_{in}+stride[1]+1}{stride[1]} + 1
+
+    if `padding` == "VALID", the output shape is: 
+
+        .. math:: 
+
+            & H_{out} = \frac{H_{in} - (dilation[0]*(kernel\_size[0]-1)+1)}{stride[0]} + 1
+
+            & W_{out} = \frac{W_{in} - (dilation[1]*(kernel\_size[1]-1)+1)}{stride[1]} + 1
+
     For example: 
+
+    Example 1: 
 
     .. code-block:: python 
 
@@ -413,14 +447,14 @@ def conv2d(
         import oneflow.typing as tp
 
 
-        def conv2d(input, filters, kernel_size, strides, padding, name):
+        def conv2d(input, filters, kernel_size, strides, padding, data_format, dilation, name):
             input_shape = input.shape
             weight_initializer = flow.truncated_normal(0.1)
             weight_regularizer = flow.regularizers.l2(0.0005)
             weight_shape = (filters,
-                            input_shape[1],
                             kernel_size[0],
-                            kernel_size[1])
+                            kernel_size[1], 
+                            input_shape[3])
 
             weight = flow.get_variable(
                 name + "-weight",
@@ -428,25 +462,73 @@ def conv2d(
                 initializer=weight_initializer,
                 regularizer=weight_regularizer,
             )
-            return flow.nn.conv2d(input, weight, strides, padding, name=name)
+            return flow.nn.conv2d(input, weight, strides, padding, data_format, dilation, name=name)
 
 
         @flow.global_function()
-        def conv2d_Job(x: tp.Numpy.Placeholder((1, 64, 32, 32))
+        def conv2d_Job(x: tp.Numpy.Placeholder((1, 16, 16, 32))
         ) -> tp.Numpy:
             conv = conv2d(x,
                         filters=128,
                         kernel_size=[3, 3],
                         strides=2,
-                        padding='SAME',
+                        padding=(0, 1, 1, 0),
+                        data_format="NHWC",
+                        dilation=[1, 1], 
                         name="Convlayer")
             return conv
 
 
-        x = np.random.randn(1, 64, 32, 32).astype(np.float32)
+        x = np.random.randn(1, 16, 16, 32).astype(np.float32)
         out = conv2d_Job(x)
 
-        # out.shape (1, 128, 16, 16)
+        # out.shape (1, 8, 8, 128)
+
+    Example 2: 
+
+    .. code-block:: python
+
+        import oneflow as flow
+        import numpy as np
+        import oneflow.typing as tp
+
+
+        def conv2d(input, filters, kernel_size, strides, padding, data_format, dilation, name):
+            input_shape = input.shape
+            weight_initializer = flow.truncated_normal(0.1)
+            weight_regularizer = flow.regularizers.l2(0.0005)
+            weight_shape = (filters,
+                            input_shape[1],
+                            kernel_size[0],
+                            kernel_size[1])
+            
+            weight = flow.get_variable(
+                name + "-weight",
+                shape=weight_shape,
+                initializer=weight_initializer,
+                regularizer=weight_regularizer,
+            )
+            return flow.nn.conv2d(input, weight, strides, padding, data_format, dilation, name=name)
+
+
+        @flow.global_function()
+        def conv2d_Job(x: tp.Numpy.Placeholder((1, 32, 16, 16))
+        ) -> tp.Numpy:
+            conv = conv2d(x,
+                        filters=128,
+                        kernel_size=[3, 3],
+                        strides=2,
+                        padding=((0, 0), (0, 0), (1, 1), (1, 1)),
+                        data_format="NCHW",
+                        dilation=[1, 1], 
+                        name="Convlayer")
+            return conv
+
+
+        x = np.random.randn(1, 32, 16, 16).astype(np.float32)
+        out = conv2d_Job(x)
+
+        # out.shape (1, 128, 8, 8)
 
     """
     assert len(input.shape) == 4
@@ -2825,7 +2907,7 @@ def deconv2d_torch(
     input=None,
     filters=None,
     dilations=None,
-) -> remote_blob_util.BlobDef:
+) -> oneflow_api.BlobDesc:
     r"""The 2d transposed convolution in Pytorch version.
 
     The output shape equation is: 
@@ -2860,7 +2942,7 @@ def deconv2d_torch(
         ValueError: data_format must be "NHWC" or "NCHW".
 
     Returns:
-        remote_blob_util.BlobDef: A `Blob` with the same type as `value`.
+        oneflow_api.BlobDesc: A `Blob` with the same type as `value`.
 
     For example: 
 
