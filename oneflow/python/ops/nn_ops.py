@@ -3317,6 +3317,55 @@ def relu6(x: oneflow_api.BlobDesc, name: Optional[str] = None) -> oneflow_api.Bl
     return flow.nn.hardtanh(x, min_val=0.0, max_val=6.0, name=name)
 
 
+@oneflow_export("nn.softsign")
+def softsign(
+    x: oneflow_api.BlobDesc, name: Optional[str] = None
+) -> oneflow_api.BlobDesc:
+    r"""The Softsign activation. 
+
+    The formula is: 
+
+    .. math:: 
+
+        {SoftSign}(x) = \frac{x}{1+|x|}
+
+    For example: 
+
+    .. code-block:: python
+
+        import oneflow as flow 
+        import oneflow.typing as tp 
+        import numpy as np 
+
+
+        @flow.global_function()
+        def softsign_job(x: tp.Numpy.Placeholder(shape=(3, )))->tp.Numpy: 
+            out = flow.nn.softsign(x)
+            return out
+        
+        x = np.array([-1, 0, 1]).astype(np.float32)
+        out = softsign_job(x)
+        # output [-0.5, 0.0, 0.5]
+
+    Args:
+        x (oneflow_api.BlobDesc): The input Tensor. 
+        name (Optional[str], optional): The name for the operation. Defaults to None.
+    Returns:
+        oneflow_api.BlobDesc: The activated Tensor. 
+    """
+    return (
+        flow.user_op_builder(
+            name if name is not None else id_util.UniqueStr("SoftSign_")
+        )
+        .Op("softsign")
+        .Input("in", [x])
+        .Output("out")
+        .Build()
+        .InferAndTryRun()
+        .RemoteBlobList()[0]
+    )
+
+
 @oneflow_export("nn.L1Loss")
 def l1_loss(
     input: oneflow_api.BlobDesc,
