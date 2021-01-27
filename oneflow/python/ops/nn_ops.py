@@ -2952,6 +2952,67 @@ def leaky_relu(
     )
 
 
+@oneflow_export("nn.rrelu")
+def rrelu(
+    x: oneflow_api.BlobDesc, lower: float = 1/8, upper: float = 1/3, name: Optional[str] = None
+) -> oneflow_api.BlobDesc:
+    r"""The RReLU activation.
+
+    The formula is: 
+
+    .. math::  
+
+        \text{RReLU}(x) = \begin{cases}
+				x & \text{ if } x \ge 0  \\
+                \alpha*x & \text{ if } x \lt 0 \\
+    		    \end{cases}
+
+    where alpha is randomly sampled from uniform distribution \mathcal{U}(\text{lower}, \text{upper})U(lower,upper).
+
+    For more details you can check the Paper `Empirical Evaluation of Rectified Activations in Convolutional Network.`.
+    
+    For example: 
+
+    .. code-block:: python 
+
+        import oneflow as flow 
+        import oneflow.typing as tp 
+        import numpy as np 
+
+        @flow.global_function()
+        def rrely_job(x: tp.Numpy.Placeholder(shape=(3, )))->tp.Numpy: 
+            return flow.nn.rrelu(x, lower=0.125, upper=0.3333)
+
+
+        x = np.array([-3, 1, 2]).astype(np.float32)
+        out = rrelu_job(x)
+
+        # output [-0.7406926  1.         2      ]
+
+    Args:
+        x (oneflow_api.BlobDesc): A `Blob` representing preactivation values.
+        lower (float, optional): lower bound of the uniform distribution. Default: \frac{1}{8}]. Defaults to 1/8.
+        upper (float, optional): upper bound of the uniform distribution. Default: \frac{1}{3}]. Defaults to 1/3.
+        name (Optional[str], optional): This operator's name(optional). Defaults to None.
+
+    Returns:
+        oneflow_api.BlobDesc: [The activation `Blob`.]
+    """
+    return (
+        flow.user_op_builder(
+            name if name is not None else id_util.UniqueStr("RRelu_")
+        )
+        .Op("rrelu")
+        .Input("x", [x])
+        .Output("y")
+        .Attr("lower", float(lower))
+        .Attr("upper", float(upper))
+        .Build()
+        .InferAndTryRun()
+        .RemoteBlobList()[0]
+    )
+
+
 @oneflow_export("nn.elu")
 def elu(
     x: oneflow_api.BlobDesc, alpha: float = 1.0, name: Optional[str] = None
