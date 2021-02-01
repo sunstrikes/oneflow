@@ -678,9 +678,18 @@ def conv3d(
 
     Args:
         input (oneflow_api.BlobDesc):  A 5D input `Blob`. [batch_num, channel, depth, height, width]
-        filters (oneflow_api.BlobDesc): A `Blob` with the same type as `input` and has the shape `[out_channels, in_channels//groups, filter_depth, filter_height, filter_width] for NCDHW, or [out_channels, filter_depth, filter_height, filter_width, in_channels//groups] for NDHWC`
+        filters (oneflow_api.BlobDesc): A `Blob` with the same type as `input` and has the shape `[out_channels, in_channels//groups, filter_depth, filter_height, filter_width] 
+            for NCDHW, or [out_channels, filter_depth, filter_height, filter_width, in_channels//groups] for NDHWC`
         strides (Union[int, Sequence[int]]): An `int` or `list of ints` that has length `3`. The stride of the sliding window for each dimension of `input`.
-        padding (Union[str, Tuple[IntPair, IntPair, IntPair, IntPair, IntPair]]): padding: `string` `"SAME"` or `"SAME_LOWER"` or `"SAME_UPPER"` or `"VALID" or Tuple[IntPair, IntPair, IntPair, IntPair, IntPair]` indicating the type of padding algorithm to use, or a list indicating the explicit paddings at the start and end of each dimension.
+        padding (Union[str, Tuple[IntPair, IntPair, IntPair, IntPair, IntPair]]): padding: The padding mode. It can be `string` type like `"SAME"` or `"SAME_LOWER"` 
+            or `"SAME_UPPER" or `"VALID". 
+            It can also be a Tuple with four elements, each element contains one or two int values. 
+            if `data_format` is `NCDHW`, the `padding` should be like ([0, 0], [0, 0], [padding_depth_top, padding_depth_bottom], 
+            [padding_height_top, padding_height_bottom], [padding_width_top, padding_width_bottom])
+            or (0, 0, padding_depth, padding_height, padding_width). 
+            if `data_format` is `NDHWC`, the `padding` should be like ([0, 0], [padding_depth_top, padding_depth_bottom], 
+            [padding_height_top, padding_height_bottom], [padding_width_top, padding_width_bottom], [0, 0])
+            or (0, padding_depth, padding_height, padding_width, 0).
         data_format (str, optional): `"NDHWC" or "NCDHW"`. Defaults to `"NCDHW"`.
         dilations (Optional[Union[int, Sequence[int]]], optional): An int or list of `ints` that has length `3`. The dilation factor for each dimension of `input`. Defaults to None.
         groups (int, optional): int value greater than 0. Defaults to 1.
@@ -704,6 +713,8 @@ def conv3d(
 
     For example: 
 
+    Example 1: 
+
     .. code-block:: python 
 
         import oneflow as flow
@@ -711,7 +722,7 @@ def conv3d(
         import oneflow.typing as tp
 
 
-        def conv3d(input, filters, kernel_size, strides, padding, name):
+        def conv3d(input, filters, kernel_size, strides, padding, data_format, name):
             input_shape = input.shape
             weight_initializer = flow.truncated_normal(0.1)
             weight_regularizer = flow.regularizers.l2(0.0005)
@@ -720,14 +731,13 @@ def conv3d(
                             kernel_size[0],
                             kernel_size[1],
                             kernel_size[2])
-
             weight = flow.get_variable(
                 name + "-weight",
                 shape=weight_shape,
                 initializer=weight_initializer,
                 regularizer=weight_regularizer,
             )
-            return flow.nn.conv3d(input, weight, strides, padding, name=name)
+            return flow.nn.conv3d(input, weight, strides, padding, data_format, name=name)
 
 
         @flow.global_function()
@@ -737,7 +747,8 @@ def conv3d(
                         filters=128,
                         kernel_size=[3, 3, 3],
                         strides=1,
-                        padding='SAME',
+                        padding=(0, 0, 1, 1, 1),
+                        data_format="NCDHW", 
                         name="Convlayer")
             return conv
 
@@ -747,6 +758,50 @@ def conv3d(
 
         # out.shape (1, 128, 10, 16, 16)
 
+    Example 2: 
+
+    .. code-block:: python 
+
+        import oneflow as flow
+        import numpy as np
+        import oneflow.typing as tp
+        
+        
+        def conv3d(input, filters, kernel_size, strides, padding, data_format, name):
+            input_shape = input.shape
+            weight_initializer = flow.truncated_normal(0.1)
+            weight_regularizer = flow.regularizers.l2(0.0005)
+            weight_shape = (filters,
+                            kernel_size[0],
+                            kernel_size[1],
+                            kernel_size[2], 
+                            input_shape[4])
+            weight = flow.get_variable(
+                name + "-weight",
+                shape=weight_shape,
+                initializer=weight_initializer,
+                regularizer=weight_regularizer,
+            )
+            return flow.nn.conv3d(input, weight, strides, padding, data_format, name=name)
+
+
+        @flow.global_function()
+        def conv3d_Job(x: tp.Numpy.Placeholder((1, 10, 16, 16, 64))
+        ) -> tp.Numpy:
+            conv = conv3d(x,
+                        filters=128,
+                        kernel_size=[3, 3, 3],
+                        strides=1,
+                        padding=(0, 1, 1, 1, 0),
+                        data_format="NDHWC", 
+                        name="Convlayer")
+            return conv
+
+
+        x = np.random.randn(1, 10, 16, 16, 64).astype(np.float32)
+        out = conv3d_Job(x)
+
+        # out.shape (1, 10, 16, 16, 128)
     """
 
     need_transpose = 0
