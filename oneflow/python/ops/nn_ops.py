@@ -3517,11 +3517,13 @@ def hardtanh(
         
         # output [[-1.25 -1.1   0.6 ]
         #         [ 1.2   1.2   1.2 ]]
+
     Args:
         x (oneflow_api.BlobDesc): The input Tensor. 
         min_val (float, optional): The minimum value of the linear region range. Defaults to -1.
         max_val (float, optional): The maximum value of the linear region range. Defaults to 1.
         name (Optional[str], optional): The name for the operation. Defaults to None.
+    
     Returns:
         oneflow_api.BlobDesc: The activated tensor. 
     """
