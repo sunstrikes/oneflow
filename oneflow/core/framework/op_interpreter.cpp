@@ -26,14 +26,25 @@ void OpExprInterpreter::ResetSelfState() { self_state_.reset(new OpExprInterpSta
 void NormalInterpreter::Apply(const OpExpr* op_expr, const TensorList& inputs, TensorList& outputs,
                               const OpExprInterpState* state) {
   ResetSelfState();
-  if (op_expr->type() == "UserOp") {
-    Apply_(dynamic_cast<const UserOpExpr*>(op_expr), inputs, outputs, state);
-  } else if (op_expr->type() == "FunctionOp") {
-    Apply_(dynamic_cast<const FunctionOpExpr*>(op_expr), inputs, outputs, state);
-  } else {
-    LOG(FATAL) << "The op type " << op_expr->type()
-               << " is not supported in LazyInterpreter::Apply currently.";
+
+#define APPLY_IF(op_type)                                                               \
+  if (op_expr->type() == #op_type) {                                                    \
+    return Apply_(dynamic_cast<const op_type##Expr*>(op_expr), inputs, outputs, state); \
   }
+  // TODO(): Optimize the type branch determination.
+  APPLY_IF(UserOp);
+  APPLY_IF(VariableOp);
+  APPLY_IF(CastToMirroredOp);
+  APPLY_IF(CastFromMirroredOp);
+  APPLY_IF(DistributeSplitOp);
+  APPLY_IF(DistributeCloneOp);
+  APPLY_IF(DistributeConcatOp);
+  APPLY_IF(DistributeAddOp);
+  APPLY_IF(FunctionOp);
+#undef APPLY_IF
+
+  LOG(FATAL) << "The op type " << op_expr->type()
+             << " is not supported in LazyInterpreter::Apply currently.";
 }
 
 OpAttribute AddOpAndInferAttribute(const OpExprInterpContext* ctx, OperatorConf& op_conf) {
@@ -57,7 +68,7 @@ void LazyInterpreter::Apply_(const UserOpExpr* op_expr, const TensorList& inputs
   *(op_conf.mutable_user_conf()) = op_expr->proto();
   *(op_conf.mutable_name()) = op_expr->op_name();
 
-  auto op_attribute = AddOpAndInferAttribute(context_, op_conf);
+  auto op_attribute = AddOpAndInferAttribute(context_.get(), op_conf);
 
   // Check outputs num and setup output tensors properties.
   CHECK_EQ(outputs.size(), op_expr->output_num());
@@ -71,6 +82,41 @@ void LazyInterpreter::Apply_(const UserOpExpr* op_expr, const TensorList& inputs
   }
 }
 
+void LazyInterpreter::Apply_(const VariableOpExpr* op_expr, const TensorList& inputs,
+                             TensorList& outputs, const OpExprInterpState* state) {
+  // TODO(hjchen2)
+}
+
+void LazyInterpreter::Apply_(const CastToMirroredOpExpr* op_expr, const TensorList& inputs,
+                             TensorList& outputs, const OpExprInterpState* state) {
+  // TODO(hjchen2)
+}
+
+void LazyInterpreter::Apply_(const CastFromMirroredOpExpr* op_expr, const TensorList& inputs,
+                             TensorList& outputs, const OpExprInterpState* state) {
+  // TODO(hjchen2)
+}
+
+void LazyInterpreter::Apply_(const DistributeSplitOpExpr* op_expr, const TensorList& inputs,
+                             TensorList& outputs, const OpExprInterpState* state) {
+  // TODO(hjchen2)
+}
+
+void LazyInterpreter::Apply_(const DistributeCloneOpExpr* op_expr, const TensorList& inputs,
+                             TensorList& outputs, const OpExprInterpState* state) {
+  // TODO(hjchen2)
+}
+
+void LazyInterpreter::Apply_(const DistributeConcatOpExpr* op_expr, const TensorList& inputs,
+                             TensorList& outputs, const OpExprInterpState* state) {
+  // TODO(hjchen2)
+}
+
+void LazyInterpreter::Apply_(const DistributeAddOpExpr* op_expr, const TensorList& inputs,
+                             TensorList& outputs, const OpExprInterpState* state) {
+  // TODO(hjchen2)
+}
+
 void LazyInterpreter::Apply_(const FunctionOpExpr* op_expr, const TensorList& inputs,
                              TensorList& outputs, const OpExprInterpState* state) {
   // TODO(hjchen2)
@@ -82,7 +128,7 @@ void EagerInterpreter::Apply_(const UserOpExpr* op_expr, const TensorList& input
   *(op_conf.mutable_user_conf()) = op_expr->proto();
   *(op_conf.mutable_name()) = op_expr->op_name();
 
-  auto op_attribute = AddOpAndInferAttribute(context_, op_conf);
+  auto op_attribute = AddOpAndInferAttribute(context_.get(), op_conf);
   const auto& parallel_conf = context_->scope->device_parallel_desc_symbol()->parallel_conf();
 
   auto cfg_op_attribute = std::make_shared<cfg::OpAttribute>(op_attribute);
@@ -97,6 +143,41 @@ void EagerInterpreter::Apply_(const UserOpExpr* op_expr, const TensorList& input
                                    find_or_creat_blob_object_fn);
   };
   void(LogicalRun(BuildInstruction).GetOrThrow());
+}
+
+void EagerInterpreter::Apply_(const VariableOpExpr* op_expr, const TensorList& inputs,
+                              TensorList& outputs, const OpExprInterpState* state) {
+  // TODO(hjchen2)
+}
+
+void EagerInterpreter::Apply_(const CastToMirroredOpExpr* op_expr, const TensorList& inputs,
+                              TensorList& outputs, const OpExprInterpState* state) {
+  // TODO(hjchen2)
+}
+
+void EagerInterpreter::Apply_(const CastFromMirroredOpExpr* op_expr, const TensorList& inputs,
+                              TensorList& outputs, const OpExprInterpState* state) {
+  // TODO(hjchen2)
+}
+
+void EagerInterpreter::Apply_(const DistributeSplitOpExpr* op_expr, const TensorList& inputs,
+                              TensorList& outputs, const OpExprInterpState* state) {
+  // TODO(hjchen2)
+}
+
+void EagerInterpreter::Apply_(const DistributeCloneOpExpr* op_expr, const TensorList& inputs,
+                              TensorList& outputs, const OpExprInterpState* state) {
+  // TODO(hjchen2)
+}
+
+void EagerInterpreter::Apply_(const DistributeConcatOpExpr* op_expr, const TensorList& inputs,
+                              TensorList& outputs, const OpExprInterpState* state) {
+  // TODO(hjchen2)
+}
+
+void EagerInterpreter::Apply_(const DistributeAddOpExpr* op_expr, const TensorList& inputs,
+                              TensorList& outputs, const OpExprInterpState* state) {
+  // TODO(hjchen2)
 }
 
 void EagerInterpreter::Apply_(const FunctionOpExpr* op_expr, const TensorList& inputs,

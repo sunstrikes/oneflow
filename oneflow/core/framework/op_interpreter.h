@@ -54,52 +54,64 @@ class OpExprInterpreter {
   std::shared_ptr<OpExprInterpState> self_state_;
 };
 
+#define FOR_ALL_OPS(_macro)   \
+  _macro(UserOp);             \
+  _macro(VariableOp);         \
+  _macro(CastToMirroredOp);   \
+  _macro(CastFromMirroredOp); \
+  _macro(DistributeSplitOp);  \
+  _macro(DistributeCloneOp);  \
+  _macro(DistributeConcatOp); \
+  _macro(DistributeAddOp);    \
+  _macro(FunctionOp);
+
 class NormalInterpreter : public OpExprInterpreter {
  public:
   NormalInterpreter() = delete;
-  NormalInterpreter(const OpExprInterpContext* context) : OpExprInterpreter(), context_(context) {}
+  NormalInterpreter(const std::shared_ptr<OpExprInterpContext>& context)
+      : OpExprInterpreter(), context_(context) {}
   virtual ~NormalInterpreter() = default;
 
   void Apply(const OpExpr* op_expr, const TensorList& inputs, TensorList& outputs,
              const OpExprInterpState* state) override;
 
-  const OpExprInterpContext* context() const { return context_; }
+  const OpExprInterpContext* context() const { return context_.get(); }
 
-#define DEFINE_NORMAL_VIRTUAL_APPLY_FUNC(op_type)                                            \
-  virtual void Apply_(const op_type* op_expr, const TensorList& inputs, TensorList& outputs, \
+#define DEFINE_NORMAL_VIRTUAL_APPLY_FUNC(op_type)                                                  \
+  virtual void Apply_(const op_type##Expr* op_expr, const TensorList& inputs, TensorList& outputs, \
                       const OpExprInterpState* state) = 0;
 
-  DEFINE_NORMAL_VIRTUAL_APPLY_FUNC(UserOpExpr);
-  DEFINE_NORMAL_VIRTUAL_APPLY_FUNC(FunctionOpExpr);
+  FOR_ALL_OPS(DEFINE_NORMAL_VIRTUAL_APPLY_FUNC);
 #undef DEFINE_NORMAL_VIRTUAL_APPLY_FUNC
 
  protected:
-  const OpExprInterpContext* context_ = nullptr;
+  std::shared_ptr<OpExprInterpContext> context_;
 };
 
-#define DECLARE_NORMAL_APPLY_FUNC(op_type)                                                   \
-  virtual void Apply_(const op_type* op_expr, const TensorList& inputs, TensorList& outputs, \
+#define DECLARE_NORMAL_APPLY_FUNC(op_type)                                                         \
+  virtual void Apply_(const op_type##Expr* op_expr, const TensorList& inputs, TensorList& outputs, \
                       const OpExprInterpState* state);
 
 class LazyInterpreter : public NormalInterpreter {
  public:
-  LazyInterpreter(const OpExprInterpContext* context) : NormalInterpreter(context) {}
+  LazyInterpreter(const std::shared_ptr<OpExprInterpContext>& context)
+      : NormalInterpreter(context) {}
 
  private:
-  DECLARE_NORMAL_APPLY_FUNC(UserOpExpr);
-  DECLARE_NORMAL_APPLY_FUNC(FunctionOpExpr);
+  FOR_ALL_OPS(DECLARE_NORMAL_APPLY_FUNC);
 };
 
 class EagerInterpreter : public NormalInterpreter {
  public:
-  EagerInterpreter(const OpExprInterpContext* context) : NormalInterpreter(context) {}
+  EagerInterpreter(const std::shared_ptr<OpExprInterpContext>& context)
+      : NormalInterpreter(context) {}
 
  private:
-  DECLARE_NORMAL_APPLY_FUNC(UserOpExpr);
-  DECLARE_NORMAL_APPLY_FUNC(FunctionOpExpr);
+  FOR_ALL_OPS(DECLARE_NORMAL_APPLY_FUNC);
 };
 
 #undef DECLARE_NORMAL_APPLY_FUNC
+#undef FOR_ALL_OPS
 
 class AutogradInterpreter : public OpExprInterpreter {
  public:
