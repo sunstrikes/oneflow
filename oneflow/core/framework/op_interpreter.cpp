@@ -14,6 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 #include "oneflow/core/framework/op_interpreter.h"
+#include "oneflow/core/framework/op_builder.h"
+#include "oneflow/core/framework/instructions_builder.h"
+#include "oneflow/api/python/job_build/job_build_and_infer.h"
 
 namespace oneflow {
 namespace one {
@@ -33,15 +36,59 @@ void NormalInterpreter::Apply(const OpExpr* op_expr, const TensorList& inputs, T
   }
 }
 
-void LazyInterpreter::Apply_(const UserOpExpr* op_expr, const TensorList& inputs,
-                             TensorList& outputs, const OpExprInterpState* state) {}
+OpAttribute AddOpAndInferAttribute(const OpExprInterpContext* ctx, OperatorConf& op_conf) {
+  int64_t symbol_id = ctx->scope->symbol_id().GetOrThrow();
+  op_conf.set_scope_symbol_id(symbol_id);
+  if (!op_conf.has_device_tag()) {
+    op_conf.set_device_tag(ctx->scope->device_parallel_desc_symbol()->device_tag());
+  }
 
-void EagerInterpreter::Apply_(const UserOpExpr* op_expr, const TensorList& inputs,
-                              TensorList& outputs, const OpExprInterpState* state) {}
+  auto infer_ctx = GetCurInferCtx().GetOrThrow();
+  if (ctx->is_mirrored_strategy_enabled) {
+    return infer_ctx->AddAndInferMirroredOp(op_conf).GetOrThrow();
+  } else {
+    return infer_ctx->AddAndInferConsistentOp(op_conf).GetOrThrow();
+  }
+}
+
+void LazyInterpreter::Apply_(const UserOpExpr* op_expr, const TensorList& inputs,
+                             TensorList& outputs, const OpExprInterpState* state) {
+  OperatorConf op_conf;
+  *(op_conf.mutable_user_conf()) = op_expr->proto();
+  *(op_conf.mutable_name()) = op_expr->op_name();
+
+  auto op_attribute = AddOpAndInferAttribute(context_, op_conf);
+
+  // Check outputs num and setup output tensors properties.
+  CHECK_EQ(outputs.size(), op_expr->output_num());
+  int i = 0;
+  for (const auto& it : op_expr->proto().output()) {
+    for (const auto& output_name : it.second.s()) {
+      // TODO
+      // outputs[i];
+      TensorNameScope::Global()->Record(outputs[i], output_name);
+    }
+  }
+}
 
 void LazyInterpreter::Apply_(const FunctionOpExpr* op_expr, const TensorList& inputs,
                              TensorList& outputs, const OpExprInterpState* state) {
   // TODO(hjchen2)
+}
+
+void EagerInterpreter::Apply_(const UserOpExpr* op_expr, const TensorList& inputs,
+                              TensorList& outputs, const OpExprInterpState* state) {
+  OperatorConf op_conf;
+  *(op_conf.mutable_user_conf()) = op_expr->proto();
+  *(op_conf.mutable_name()) = op_expr->op_name();
+
+  auto op_attribute = AddOpAndInferAttribute(context_, op_conf);
+
+  const auto& parallel_conf = context_->scope->device_parallel_desc_symbol()->parallel_conf();
+  auto BuildInstruction = [](InstructionsBuilder* builder) {
+
+  };
+  
 }
 
 void EagerInterpreter::Apply_(const FunctionOpExpr* op_expr, const TensorList& inputs,
