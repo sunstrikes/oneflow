@@ -30,7 +30,7 @@ import oneflow.python.framework.session_context as session_ctx
 import oneflow.python.framework.remote_blob as remote_blob_util
 import oneflow.python.lib.core.async_util as async_util
 import oneflow.python.eager.blob_cache as blob_cache_util
-import oneflow.python.eager.vm_util as vm_util
+import oneflow.python.eager.boxing_util as boxing_util
 import oneflow.python.eager.op_infer_util as op_infer_util
 import oneflow.core.framework.variable_meta_info_pb2 as variable_meta_info_pb
 import oneflow.core.framework.user_op_attr_pb2 as attr_value_pb
@@ -41,6 +41,7 @@ import oneflow.python.ops.get_variable as get_variable
 from oneflow.python.oneflow_export import oneflow_export
 import oneflow_api.oneflow.core.register.logical_blob_id as lbi_util
 from oneflow_api import EagerBlobTrait
+import oneflow_api
 from typing import Any, Callable, Dict, List, Union, Sequence, Optional, Iterable, Tuple
 
 
@@ -294,19 +295,25 @@ def _LogicalSlice(
             op_conf.user_conf.attr["start"].at_list_int64.val[:] = start
             op_conf.user_conf.attr["stop"].at_list_int64.val[:] = stop
             op_conf.user_conf.attr["step"].at_list_int64.val[:] = [1] * len(start)
-            bn_in_op2blob_object = {"x_0": input_blob_object}
+            bn_in_op2blob_object = oneflow_api.deprecated.BnInOp2BlobObject()
+            bn_in_op2blob_object["x_0"] = input_blob_object
             scope_symbol_id = _GetScopeSymbolIdFromEagerBlob(input_blob)
             op_attribute = op_infer_util.Infer(
                 op_conf, bn_in_op2blob_object, scope_symbol_id
             )
+            cfg_op_attribute = oneflow_api.deprecated.MakeOpAttributeByString(
+                str(op_attribute)
+            )
             builder.StatelessCall(
-                op_attribute,
-                parallel_conf=parallel_conf,
-                bn_in_op2blob_object=bn_in_op2blob_object,
+                cfg_op_attribute,
+                parallel_conf,
+                bn_in_op2blob_object,
+                boxing_util.BoxingTo,
+                blob_cache_util.FindOrCreateDelegateBlobObject,
             )
             Yield(bn_in_op2blob_object["y_0"])
 
-        vm_util.LogicalRun(build)
+        oneflow_api.deprecated.LogicalRun(build)
 
     lbi = lbi_util.LogicalBlobId()
     lbi.set_op_name(op_name)
@@ -385,18 +392,25 @@ def _LogicalSliceAssign(
         op_conf.user_conf.attr["start"].at_list_int64.val[:] = start
         op_conf.user_conf.attr["stop"].at_list_int64.val[:] = stop
         op_conf.user_conf.attr["step"].at_list_int64.val[:] = [1] * len(start)
-        bn_in_op2blob_object = {"ref_0": ref_blob_object, "value_0": value_blob_object}
+        bn_in_op2blob_object = oneflow_api.deprecated.BnInOp2BlobObject()
+        bn_in_op2blob_object["ref_0"] = ref_blob_object
+        bn_in_op2blob_object["value_0"] = value_blob_object
         scope_symbol_id = _GetScopeSymbolIdFromEagerBlob(ref_blob)
         op_attribute = op_infer_util.Infer(
             op_conf, bn_in_op2blob_object, scope_symbol_id
         )
+        cfg_op_attribute = oneflow_api.deprecated.MakeOpAttributeByString(
+            str(op_attribute)
+        )
         builder.StatelessCall(
-            op_attribute,
-            parallel_conf=parallel_conf,
-            bn_in_op2blob_object=bn_in_op2blob_object,
+            cfg_op_attribute,
+            parallel_conf,
+            bn_in_op2blob_object,
+            boxing_util.BoxingTo,
+            blob_cache_util.FindOrCreateDelegateBlobObject,
         )
 
-    vm_util.LogicalRun(BuildAssignInstruction)
+    oneflow_api.deprecated.LogicalRun(BuildAssignInstruction)
     blob_cache_util.TryDisableBlobCache(ref_blob_object)
 
 

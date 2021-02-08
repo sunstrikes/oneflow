@@ -24,7 +24,7 @@ import oneflow.python.framework.balanced_splitter as balanced_splitter
 import oneflow.python.framework.remote_blob as remote_blob_util
 import oneflow.python.framework.id_util as id_util
 import oneflow.python.eager.blob_cache as blob_cache_util
-import oneflow.python.eager.vm_util as vm_util
+import oneflow.python.eager.boxing_util as boxing_util
 import oneflow.python.eager.blob_register as blob_register_util
 import oneflow.core.operator.op_conf_pb2 as op_conf_util
 import oneflow.core.register.logical_blob_id_pb2 as logical_blob_id_util
@@ -144,17 +144,24 @@ def _CreateEagerInputBlobAndFeedValue(arg_blob_def, arg_ndarray):
 
 def _MakeInputBlobObject(arg_blob_def):
     input_op_conf, lbi = _MakeInputOpConfAndRetLbi(arg_blob_def)
-    bn_in_op2blob_object = {}
+    bn_in_op2blob_object = oneflow_api.deprecated.BnInOp2BlobObject()
 
     def BuildInputInstruction(builder):
         op_attribute = arg_blob_def.EagerAddAndInferOp(input_op_conf)
         scope = oneflow.current_scope()
         parallel_conf = scope.device_parallel_desc_symbol.parallel_conf
+        cfg_op_attribute = oneflow_api.deprecated.MakeOpAttributeByString(
+            str(op_attribute)
+        )
         builder.StatelessCall(
-            op_attribute, parallel_conf, bn_in_op2blob_object=bn_in_op2blob_object
+            cfg_op_attribute,
+            parallel_conf,
+            bn_in_op2blob_object,
+            boxing_util.BoxingTo,
+            blob_cache_util.FindOrCreateDelegateBlobObject,
         )
 
-    vm_util.LogicalRun(BuildInputInstruction)
+    oneflow_api.deprecated.LogicalRun(BuildInputInstruction)
     return bn_in_op2blob_object["out"], lbi
 
 
@@ -168,7 +175,7 @@ def _GetPhysicalBlobObjects(logical_blob_object, lbi):
             logical_blob_object
         )
 
-    vm_util.LogicalRun(BuildLogical2PhysicalInstruction)
+    oneflow_api.deprecated.LogicalRun(BuildLogical2PhysicalInstruction)
     return physical_blob_objects
 
 
@@ -266,10 +273,14 @@ def _FeedValueToInputPhysicalBlob(feed_ctx, blob_def, blob_object):
     assert callable(FeedBlob)
 
     def BuildFeedInstruction(builder):
-        builder.FeedBlob(blob_object, FeedBlob)
-        builder.InsertRemoveForeignCallbackInstruction(blob_object.object_id, FeedBlob)
+        builder.FeedBlob(
+            blob_object, python_callback.GetIdForRegisteredCallback(FeedBlob)
+        )
+        builder.InsertRemoveForeignCallbackInstruction(
+            blob_object.object_id, python_callback.GetIdForRegisteredCallback(FeedBlob)
+        )
 
-    vm_util.PhysicalRun(BuildFeedInstruction)
+    oneflow_api.deprecated.PhysicalRun(BuildFeedInstruction)
 
 
 def _MakeFeedBlobCallback(feed_ctx, blob_def, blob_object):

@@ -30,7 +30,8 @@ import oneflow.core.job.regularizer_conf_pb2 as regularizer_conf_util
 import oneflow.core.register.logical_blob_id_pb2 as logical_blob_id_util
 import oneflow.python.framework.hob as hob
 import oneflow.python.framework.dtype as dtype_util
-import oneflow.python.eager.vm_util as vm_util
+import oneflow.python.eager.blob_cache as blob_cache_util
+import oneflow.python.eager.boxing_util as boxing_util
 import oneflow.python.eager.gradient_util as gradient_util
 import oneflow.python.eager.op_executor as op_executor
 import oneflow.python.lib.core.enable_if as enable_if
@@ -347,17 +348,24 @@ def _CreateVariableBlob(op_conf):
 
 
 def CreateEagerVariableBlob(op_attribute, job_name=""):
-    bn_in_op2blob_object = {}
+    bn_in_op2blob_object = oneflow_api.deprecated.BnInOp2BlobObject()
 
     def BuildInstruction(builder):
         parallel_conf = (
             oneflow.current_scope().device_parallel_desc_symbol.parallel_conf
         )
+        cfg_op_attribute = oneflow_api.deprecated.MakeOpAttributeByString(
+            str(op_attribute)
+        )
         builder.StatelessCall(
-            op_attribute, parallel_conf, bn_in_op2blob_object=bn_in_op2blob_object
+            cfg_op_attribute,
+            parallel_conf,
+            bn_in_op2blob_object,
+            boxing_util.BoxingTo,
+            blob_cache_util.FindOrCreateDelegateBlobObject,
         )
 
-    vm_util.LogicalRun(BuildInstruction)
+    oneflow_api.deprecated.LogicalRun(BuildInstruction)
     lbi = lbi_util.LogicalBlobId()
     lbi.set_op_name(op_attribute.op_conf.name)
     lbi.set_blob_name(op_attribute.op_conf.variable_conf.out)
