@@ -83,12 +83,20 @@ void EagerInterpreter::Apply_(const UserOpExpr* op_expr, const TensorList& input
   *(op_conf.mutable_name()) = op_expr->op_name();
 
   auto op_attribute = AddOpAndInferAttribute(context_, op_conf);
-
   const auto& parallel_conf = context_->scope->device_parallel_desc_symbol()->parallel_conf();
-  auto BuildInstruction = [](InstructionsBuilder* builder) {
 
+  auto cfg_op_attribute = std::make_shared<cfg::OpAttribute>(op_attribute);
+  auto cfg_parallel_conf = std::make_shared<cfg::ParallelConf>(parallel_conf);
+  auto BuildInstruction = [cfg_op_attribute,
+                           cfg_parallel_conf](const std::shared_ptr<InstructionsBuilder>& builder) {
+    // TODO(hjchen2) Complete bn2blob_object and find_or_creat_blob_object_fn.
+    std::shared_ptr<HashMap<std::string, std::shared_ptr<compatible_py::BlobObject>>>
+        bn2blob_object;
+    InstructionsBuilder::FindOrCreateDelegateBlobObjectFun find_or_creat_blob_object_fn;
+    builder->NoBoxingStatelessCall(cfg_op_attribute, cfg_parallel_conf, bn2blob_object,
+                                   find_or_creat_blob_object_fn);
   };
-  
+  void(LogicalRun(BuildInstruction).GetOrThrow());
 }
 
 void EagerInterpreter::Apply_(const FunctionOpExpr* op_expr, const TensorList& inputs,
