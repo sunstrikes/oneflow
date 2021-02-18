@@ -28,7 +28,9 @@ class OpExprInterpState {
 
   const TensorList& SavedTensors() const { return saved_tensors_; }
 
-  void SaveTensorForBackward(const TensorRef& tensor) { saved_tensors_.push_back(tensor); }
+  void SaveTensorForBackward(const std::shared_ptr<Tensor>& tensor) {
+    saved_tensors_.push_back(tensor);
+  }
 
  private:
   TensorList saved_tensors_;
@@ -72,17 +74,7 @@ class NormalInterpreter : public OpExprInterpreter {
       : OpExprInterpreter(), context_(context) {}
   virtual ~NormalInterpreter() = default;
 
-  void Apply(const OpExpr* op_expr, const TensorList& inputs, TensorList& outputs,
-             const OpExprInterpState* state) override;
-
   const OpExprInterpContext* context() const { return context_.get(); }
-
-#define DEFINE_NORMAL_VIRTUAL_APPLY_FUNC(op_type)                                                  \
-  virtual void Apply_(const op_type##Expr* op_expr, const TensorList& inputs, TensorList& outputs, \
-                      const OpExprInterpState* state) = 0;
-
-  FOR_ALL_OPS(DEFINE_NORMAL_VIRTUAL_APPLY_FUNC);
-#undef DEFINE_NORMAL_VIRTUAL_APPLY_FUNC
 
  protected:
   std::shared_ptr<OpExprInterpContext> context_;
@@ -97,14 +89,20 @@ class LazyInterpreter : public NormalInterpreter {
   LazyInterpreter(const std::shared_ptr<OpExprInterpContext>& context)
       : NormalInterpreter(context) {}
 
+  void Apply(const OpExpr* op_expr, const TensorList& inputs, TensorList& outputs,
+             const OpExprInterpState* state) override;
+
  private:
-  FOR_ALL_OPS(DECLARE_NORMAL_APPLY_FUNC);
+  DECLARE_NORMAL_APPLY_FUNC(BuiltinOp);
 };
 
 class EagerInterpreter : public NormalInterpreter {
  public:
   EagerInterpreter(const std::shared_ptr<OpExprInterpContext>& context)
       : NormalInterpreter(context) {}
+
+  void Apply(const OpExpr* op_expr, const TensorList& inputs, TensorList& outputs,
+             const OpExprInterpState* state) override;
 
  private:
   FOR_ALL_OPS(DECLARE_NORMAL_APPLY_FUNC);
