@@ -39,7 +39,6 @@ OpAttribute AddOpAndInferAttribute(const OpExprInterpContext* ctx, OperatorConf&
   if (!op_conf.has_device_tag()) {
     op_conf.set_device_tag(ctx->scope->device_parallel_desc_symbol()->device_tag());
   }
-
   auto infer_ctx = GetCurInferCtx().GetOrThrow();
   if (ctx->is_mirrored_strategy_enabled) {
     return infer_ctx->AddAndInferMirroredOp(op_conf).GetOrThrow();
@@ -50,8 +49,19 @@ OpAttribute AddOpAndInferAttribute(const OpExprInterpContext* ctx, OperatorConf&
 
 void LazyInterpreter::Apply_(const BuiltinOpExpr* op_expr, const TensorList& inputs,
                              TensorList& outputs, const OpExprInterpState* state) {
+  CHECK_EQ(inputs.size(), op_expr->input_num());
+  std::unordered_map<std::string, std::string> actual_input_names;
+  for (int i = 0; i < inputs.size(); ++i) {
+    const std::string& k = op_expr->indexed_input_names().at(i);
+    actual_input_names[k] = TensorNameScope::Global()->Lookup(outputs[i]);
+  }
+  auto input_name_mutator = [&actual_input_names](const std::string& name) {
+    const auto& it = actual_input_names.find(name);
+    CHECK(it != actual_input_names.end());
+    return it->second;
+  };
   OperatorConf op_conf;
-  op_expr->BuildOpConf(&op_conf);
+  op_expr->BuildOpConf(&op_conf, input_name_mutator);
   auto op_attribute = AddOpAndInferAttribute(context_.get(), op_conf);
 
   // Check outputs num and setup output tensors properties.
@@ -87,8 +97,9 @@ void EagerInterpreter::Apply(const OpExpr* op_expr, const TensorList& inputs, Te
 
 void EagerInterpreter::Apply_(const UserOpExpr* op_expr, const TensorList& inputs,
                               TensorList& outputs, const OpExprInterpState* state) {
+  CHECK_EQ(inputs.size(), op_expr->input_num());
   OperatorConf op_conf;
-  op_expr->BuildOpConf(&op_conf);
+  op_expr->BuildOpConf(&op_conf, [](const std::string& name) { return name; });
 
   auto op_attribute = AddOpAndInferAttribute(context_.get(), op_conf);
   const auto& parallel_conf = context_->scope->device_parallel_desc_symbol()->parallel_conf();
