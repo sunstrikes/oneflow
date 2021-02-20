@@ -25,7 +25,7 @@ namespace oneflow {
 namespace one {
 
 ONEFLOW_API_PYBIND11_MODULE("", m) {
-  py::class_<MirroredTensor, std::shared_ptr<MirroredTensor>>(m, "Tensor")
+  py::class_<MirroredTensor, std::shared_ptr<MirroredTensor>>(m, "MirroredTensor")
       .def(
           py::init([](const py::tuple& py_shape, int dtype, const std::shared_ptr<Device>& device) {
             DimVector shape_dims;

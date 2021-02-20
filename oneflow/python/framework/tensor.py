@@ -19,8 +19,49 @@ from oneflow.python.oneflow_export import oneflow_export
 import oneflow.python.framework.device as oneflow_device
 
 
-@oneflow_export("tensor")
-class Tensor(oneflow_api.Tensor):
+def get_default_dtype():
+    return dtype_util.float
+
+
+def is_consistent_now():
+    return False
+
+
+@oneflow_export("Tensor")
+class Tensor:
+    def __init__(
+        self, shape: tuple = (), device: oneflow_device = oneflow_device.Device("cpu"),
+    ):
+        self._dtype = get_default_dtype()
+        self._shape = shape
+        self._device = device
+        # a MirroredTensor or ConsistentTensor object
+        self._impl = None
+
+    @property
+    def shape(self):
+        return self._shape
+
+    @property
+    def dtype(self):
+        return self._dtype
+
+    @property
+    def device(self):
+        return self._device
+
+    def _initialize(self):
+        if is_consistent_now():
+            raise NotImplementedError()
+        else:
+            self._impl = MirroredTensor(self.shape, self.dtype, self.device)
+
+    def _initialize_with_data(self, data):
+        raise NotImplementedError()
+
+
+@oneflow_export("MirroredTensor")
+class MirroredTensor(oneflow_api.MirroredTensor):
     def __init__(
         self,
         shape: tuple = (),
@@ -28,7 +69,7 @@ class Tensor(oneflow_api.Tensor):
         device: oneflow_device = oneflow_device.Device("cpu"),
     ):
         of_dtype = dtype_util.convert_oneflow_dtype_to_proto_dtype(dtype)
-        oneflow_api.Tensor.__init__(self, shape, of_dtype, device)
+        oneflow_api.MirroredTensor.__init__(self, shape, of_dtype, device)
 
     @property
     def dtype(self):
